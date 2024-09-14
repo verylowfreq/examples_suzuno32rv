@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+// "use strict";
+
+var connected_device = null;
+
+const sleep = msec => new Promise(resolve => setTimeout(resolve, msec));
+
+const connect = () => {
+    if (!navigator.usb) {
+        alert("WebUSBに対応していない環境です。Google Chromeを利用してください。");
+        return;
+    }
+
+    navigator.usb.requestDevice({filters:[{ vendorId: 0x239A , productId: 0xCAFE }]})
+        .then(async (device) => {
+            connected_device = device;
+            await connected_device.open();
+            await connected_device.selectConfiguration(1);
+            await connected_device.claimInterface(2);
+            await connected_device.controlTransferOut({
+                'requestType': 'class',
+                'recipient': 'interface',
+                'request': 0x22,
+                'value': 0x01,
+                'index': 2 // interfaceNumber
+            });
+        })
+        .catch((err) => {
+            alert(err);
+        });
+};
+
+const sendCommand = async (cmd) => {
+    let cmdbin = new Uint8Array(1);
+    new TextEncoder().encodeInto(cmd, cmdbin);
+    await connected_device.transferOut(2, cmdbin);
+};
+
+const ledOn = async() => {
+    if (connected_device) {
+        sendCommand("1");
+    }
+};
+
+const ledOff = () => {
+    if (connected_device) {
+        sendCommand("0");
+    }
+};
+
+</script>
+</head>
+<body>
+<p>
+    <button onclick="connect()">デバイスに接続します</button>
+</p>
+<p><button onclick="ledOn()">LEDを点灯する</button> - <button onclick="ledOff()">LEDを消灯する</button></p>
+</body>
+</html>

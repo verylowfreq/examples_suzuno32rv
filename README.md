@@ -30,16 +30,11 @@ SPL, Timer, GPIO
 TinyUSB, USB Device, Keyboard
 
 
+## tinyusb_usbd_keyboard : MIDI入力デバイスとして振舞う
+
+TinyUSB, USB Device, MIDI input
+
+
 ## tinyusb_usbd_webusb : WebUSBデバイスとして振舞う
 
 TinyUSB, USB Device, WebUSB
-
-
-## evt_usbhost_read_keyboard : USBキーボードの入力を読み取る
-
-EVT, USB Host, Keyboard
-
-
-## evt_usbh_usbstorage_lcdshield : USBマスストレージからJPEGファイルを読み込んでLCDシールドに表示する
-
-EVT, USB Host, Mass storage, LCD Shield

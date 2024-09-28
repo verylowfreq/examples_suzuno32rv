@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<script src="bitmap_1.js"></script>
+<script src="bitmap_3.js"></script>
+
+<script>
+
+var device = null;
+
+const sleep = msec => new Promise(resolve => setTimeout(resolve, msec));
+
+const listdevicesbutton = () => {
+    navigator.usb.getDevices().then((devices) => {
+  console.log(`デバイス数: ${devices.length}`);
+  devices.forEach((device) => {
+    console.log(
+      `製品名: ${device.productName} シリアル番号 ${device.serialNumber}`,
+    );
+  });
+});
+};
+    
+const connectbutton = () => {
+    var buf = new ArrayBuffer(1);
+    var dat = new Uint8Array(buf, 0, buf.length);
+    dat[0] = 0x81;
+
+    // USB\VID_239A&PID_CAFE&MI_02
+
+
+    navigator.usb.requestDevice( { filters: [{ vendorId: 0x239A , productId: 0xCAFE }] } )
+        .then(selectedDevice => {
+            device = selectedDevice;
+            return device.open(); // Begin a session.
+        })
+        .then(() => {
+            console.debug(device);
+        })
+
+        .then(() => device.selectConfiguration(1)) // Select configuration #1 for the device.
+        .then(() => device.claimInterface(2)) // Request exclusive control over interface #2.
+
+        // .then(() => device.transferOut(1, dat)) // Waiting for 64 bytes of data from endpoint #5.
+    // .then(() => device.transferIn(1, 64)) // Waiting for 64 bytes of data from endpoint #5.
+    // .then(result => {
+    //     for(i=0;i<result.data.byteLength;i++)
+    //     {
+    //         console.log('Received: ' + result.data.getInt8(i));
+    //     }
+    // })
+
+    .then(() => {
+            
+            console.debug(device);
+        })
+        .then(() => {
+            console.log(`Send connect control`);
+            device.controlTransferOut({
+                'requestType': 'class',
+                'recipient': 'interface',
+                'request': 0x22,
+                'value': 0x01,
+                'index': 2 // interfaceNumber
+            })
+        })
+        .then(async () => {
+            {
+                let cmd = new Uint8Array(1);
+                cmd[0] = 0x03;
+                console.log(`Send DISPLAY_OFF command`);
+                await device.transferOut(2, cmd);
+            }
+            await sleep(1);
+            {
+                let cmd = new Uint8Array(1);
+                cmd[0] = 0x02;
+                console.log(`Send clear command`);
+                await device.transferOut(2, cmd);
+            }
+            await sleep(1);
+
+            console.log(`Show test pattern`);
+
+            const datalen = 60;
+            for (let i = 0; i < 128 * 64; i += datalen) {
+                console.log(`Send ${datalen} bytes at offset ${i}`);
+                let offset = i;
+                let cmd = new Uint8Array(1 + 2 + 1 + datalen);
+                cmd[0] = 0x01;
+                cmd[1] = offset & 0xff;
+                cmd[2] = offset >> 8;
+                cmd[3] = datalen;
+                for (let j = 0; j < datalen; j++) {
+                    cmd[4 + j] = bitmap_1[offset + j];
+                }
+
+                let result = await device.transferOut(2, cmd);
+                console.debug(result);
+
+                // OK: 15msec, 20msec, 50msec
+                // NG: 10msec
+                await sleep(1);
+            }
+
+            
+            {
+                let cmd = new Uint8Array(1);
+                cmd[0] = 0x04;
+                console.log(`Send DISPLAY_ON command`);
+                await device.transferOut(2, cmd);
+            }
+            await sleep(1);
+        })
+    .catch(error => {
+        console.log(error);
+        if (device) {
+            device.close();
+        }
+    });
+};
+
+const disconnectbutton = () => {
+    if (device == null) {
+        return;
+    }
+    console.log(`Send disconnect control`);
+    device.controlTransferOut({
+        'requestType': 'class',
+        'recipient': 'interface',
+        'request': 0x22,
+        'value': 0x00,
+        'index': 2 // interfaceNumber
+    })
+        .then(() => {
+            {}
+        })
+        .catch((err) => {
+            console.error(err);
+        });
+};
+
+
+const show_image = async (imagedata) => {
+    if (device === null) {
+        console.debug("device not connected.");
+        return;
+    }
+
+    {
+        let cmd = new Uint8Array(1);
+        cmd[0] = 0x03;
+        console.log(`Send DISPLAY_OFF command`);
+        await device.transferOut(2, cmd);
+    }
+    await sleep(1);
+    {
+        let cmd = new Uint8Array(1);
+        cmd[0] = 0x02;
+        console.log(`Send clear command`);
+        await device.transferOut(2, cmd);
+    }
+    await sleep(1);
+
+    const datablocklen = 60;
+    for (let i = 0; i < 128 * 64;) {
+        const remainlen = 128 * 64 - i;
+        const sendlen = datablocklen;
+        // if (remainlen < sendlen) {
+        //     sendlen = remainlen;
+        // }
+        console.log(`Send ${sendlen} bytes at offset ${i}`);
+        let offset = i;
+        let cmd = new Uint8Array(1 + 2 + 1 + sendlen);
+        cmd[0] = 0x01;
+        cmd[1] = offset & 0xff;
+        cmd[2] = offset >> 8;
+        cmd[3] = sendlen;
+        for (let j = 0; j < sendlen; j++) {
+            cmd[4 + j] = imagedata[offset + j];
+        }
+
+        let result = await device.transferOut(2, cmd);
+        console.debug(result);
+
+        await sleep(1);
+
+        i += sendlen;
+    }
+
+    
+    {
+        let cmd = new Uint8Array(1);
+        cmd[0] = 0x04;
+        console.log(`Send DISPLAY_ON command`);
+        await device.transferOut(2, cmd);
+    }
+    await sleep(1);
+};
+
+const show_1 = async () => {
+    show_image(bitmap_1);
+};
+// const show_2 = async () => {
+//     show_image(sample_12);
+// };
+const show_3 = async () => {
+    show_image(bitmap_3);
+};
+
+    </script>
+
+<style>
+button {
+    font-size: 24px;
+    padding: 0.5em;
+    margin: 0.5em;
+}
+</style>
+
+</head>
+
+<body>
+    <p><!-- button onclick="listdevicesbutton()">List devices</button --> <button onclick="connectbutton()">Connect</button> <button onclick="disconnectbutton()">Disconnect</button></p>
+    <br>
+    <p><button onclick="show_1()">Image 1</button> <!-- button onclick="show_2()">Image 2</button --> <button onclick="show_3()">Image 3</button></p>
+</body>
+</html>

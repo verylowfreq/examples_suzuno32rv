@@ -30,8 +30,8 @@ void servo_init() {
   Timer2.pause();
   Timer2.setPrescaleFactor(1440);
   Timer2.setOverflow(2000);
-  Timer2.setMode(TIM_CHANNEL_CH1, TIMER_OUTPUT_COMPARE_PWM1, PA0);
-  Timer2.setCaptureCompare(TIM_CHANNEL_CH1, 1500 / 10);
+  Timer2.setMode(1, TIMER_OUTPUT_COMPARE_PWM1, PA0);
+  Timer2.setCaptureCompare(1, 1500 / 10);
   Timer2.refresh();
   Timer2.resume();
 }
@@ -40,5 +40,5 @@ void servo_set_angle(int angle) {
   angle = constrain(angle, 0, 180);
   uint16_t compare_ticks = ((angle / 180.0) * (2400 - 500) + 500) / 10;
 
-  Timer2.setCaptureCompare(TIM_CHANNEL_CH1, compare_ticks);
+  Timer2.setCaptureCompare(1, compare_ticks);
 }
